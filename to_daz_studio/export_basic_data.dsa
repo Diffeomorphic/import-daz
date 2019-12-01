@@ -1,0 +1,166 @@
+// DAZ Studio version 4.9.4.117 filetype DAZ Script
+
+
+var appName = "export_basic_data";
+var version = 0.4;
+
+function exportBasicData()
+{
+	var filename = FileDialog.doFileDialog( 
+		false, 
+		"Save As", 
+		getScenePath(), 
+		"JSON Files (*.json *.duf)" 
+		);
+	if( !filename )
+	{
+		return;
+	}
+	
+	fp = new DzFile( filename );
+
+	debug( fp.baseName() );
+
+	fp.open( fp.WriteOnly );
+	
+	fp.writeLine("{");
+	fp.writeLine("	\"application\": \"export_basic_data\",");
+	fp.writeLine("	\"version\": " + version + ",");
+	
+	fp.writeLine("	\"figures\": [");
+
+	for ( var i = 0; i < Scene.getNumNodes(); i++ )
+	{
+		node = Scene.getNode(i);
+		if ( node.inherits( "DzSkeleton" ) )
+		{
+			doFigure(fp, node);
+		}
+		else
+		{
+			obj = node.getObject();
+			if (obj != null) 
+			{
+				doMesh(fp, obj, true, node.name, "		]", "	},");
+			}
+		}
+	}
+
+	fp.writeLine("	{" );
+	fp.writeLine("		\"name\": \"dummy\",");
+	fp.writeLine("		\"num verts\": 0");
+	fp.writeLine("	}" );
+	
+	fp.writeLine("	]");
+	fp.writeLine("}" );
+	fp.close();
+	msg = "File \"" + filename + "\" saved.";
+	MessageBox.information( msg, appName, "&OK" );
+}
+
+//===============================================================================
+//
+//===============================================================================
+
+function doFigure (fp, figure)
+{
+	figure.finalize();
+	var flabel = figure.getLabel();
+    	startObject(fp, figure.name, flabel);
+
+	var obj = figure.getObject();
+	if (obj != null) 
+	{
+		doMesh(fp, obj, false, null, "		],", "")
+	}
+	
+	var bones = figure.getAllBones();
+	var n = bones.length;
+	
+	fp.writeLine("		\"bones\": ");
+	fp.writeLine("		[");  
+	c = ","
+	for( var i = 0; i < n; i++ )
+	{
+		bone = bones[i];
+		bone.finalize();
+		fp.writeLine("			{");
+		fp.writeLine("				\"name\": \""+ bone.name + "\",");
+		fp.writeLine("				\"center_point\": " + bone.getOrigin() + ",");
+		fp.writeLine("				\"end_point\": " + bone.getEndPoint() + ",");	 
+		fp.writeLine("				\"ws_pos\": " + bone.getWSPos() + ",");	 
+		fp.writeLine("				\"ws_rot\": " + bone.getWSRot() + ",");	 
+		fp.writeLine("				\"ws_scale\": " + bone.getWSScale() + ",");	 
+		fp.writeLine("				\"ws_transform\": " + bone.getWSTransform() );	 		
+		if (i == n-1) c = "";
+		fp.writeLine("			}" + c );
+	}
+	fp.writeLine("		]");  	
+	fp.writeLine("	}," );	
+}
+
+//===============================================================================
+//
+//===============================================================================
+
+function startObject(fp, name, label)
+{
+	fp.writeLine("	{" );
+	fp.writeLine("		\"name\": \"" + name + "\",");
+	fp.writeLine("		\"label\": \"" + label + "\",");
+}
+
+
+function doMesh (fp, obj, start, name, str1, str2)
+{
+	var geom = obj.getCachedGeom();
+	if (geom == null)
+		return false;
+	var shape = obj.getCurrentShape();
+	if (shape == null)
+		return false;
+	var mesh = shape.getFacetMesh( false );
+	if (mesh == null)
+		return false;
+
+	if (start)
+	{
+		startObject(fp, name, "undefined");
+	}
+
+	var nv = mesh.getNumVertices();
+	var ne = mesh.getNumEdges();
+	var nf = mesh.getNumFacets();
+		
+	fp.writeLine("		\"num verts\": " + nv + ",");
+	fp.writeLine("		\"num edges\": " + ne + ",");
+	fp.writeLine("		\"num faces\": " + nf + ",");
+	fp.writeLine("		\"vertices\": [" );
+	
+	var c = ","
+	for (var i = 0; i < nv; i++)
+	{
+		var v = geom.getVertex(i);
+		if (i == nv-1) c = "";
+		fp.writeLine("			[" + v.x + ", " + v.y + ", " + v.z + "]" + c)
+	}	
+	fp.writeLine(str1)
+	fp.writeLine(str2)
+	return true;
+}
+
+//==============================================================================
+// Find current duf scene path. (it should be saved untill export json)
+//==============================================================================
+
+function getScenePath()
+{
+	var fPath = Scene.getFilename(); //get current scene file path
+	var val = fPath.left( fPath.length - 4 ) + ".json"; // .duf => .json
+	return (val);
+}
+
+//==============================================================================
+// Run it
+//==============================================================================
+exportBasicData()
